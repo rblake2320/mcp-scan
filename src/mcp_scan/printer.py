@@ -4,6 +4,16 @@ import rich
 from rich.text import Text
 from rich.tree import Tree
 
+try:  # pragma: no cover - compatibility shim for Python < 3.11
+    ExceptionGroup
+except NameError:  # pragma: no cover - fallback for older Python versions
+    class ExceptionGroup(Exception):
+        """Minimal stand-in for ``ExceptionGroup`` on Python < 3.11."""
+
+        def __init__(self, *exceptions: Exception) -> None:
+            super().__init__("ExceptionGroup")
+            self.exceptions = list(exceptions)
+
 from .models import Entity, EntityScanResult, ScanPathResult, entity_type_to_str, hash_entity
 
 
