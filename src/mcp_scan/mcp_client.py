@@ -4,10 +4,43 @@ from typing import AsyncContextManager, Type
 
 import aiofiles  # type: ignore
 import pyjson5
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.sse import sse_client
-from mcp.client.stdio import stdio_client
-from mcp.types import Prompt, Resource, Tool
+
+try:  # pragma: no cover - optional dependency
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.sse import sse_client
+    from mcp.client.stdio import stdio_client
+    from mcp.types import Prompt, Resource, Tool
+except Exception:  # pragma: no cover - allow running tests without mcp installed
+    class _Missing:
+        def __getattr__(self, name):
+            raise ImportError("mcp package is required for this operation")
+
+    class ClientSession(_Missing):
+        async def __aenter__(self):  # type: ignore[override]
+            raise ImportError("mcp package is required for this operation")
+
+        async def __aexit__(self, exc_type, exc, tb):  # type: ignore[override]
+            pass
+
+    class StdioServerParameters(_Missing):
+        def __init__(self, *args, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    async def sse_client(*args, **kwargs):
+        raise ImportError("mcp package is required for this operation")
+
+    async def stdio_client(*args, **kwargs):
+        raise ImportError("mcp package is required for this operation")
+
+    class Prompt:  # type: ignore[empty-body]
+        pass
+
+    class Resource:  # type: ignore[empty-body]
+        pass
+
+    class Tool:  # type: ignore[empty-body]
+        pass
 
 from mcp_scan.models import (
     ClaudeConfigFile,

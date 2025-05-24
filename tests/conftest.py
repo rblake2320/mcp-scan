@@ -1,6 +1,18 @@
 """Global pytest fixtures for mcp-scan tests."""
 
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
 import pytest
+
+# Ensure the src directory is on the import path so tests can import the
+# ``mcp_scan`` package without an editable install.
+BASE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(BASE_DIR / "src"))
+# Provide lightweight test stubs for optional dependencies such as ``pydantic``.
+sys.path.insert(0, str(BASE_DIR / "tests" / "stubs"))
 
 
 @pytest.fixture
