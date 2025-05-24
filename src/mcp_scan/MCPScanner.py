@@ -3,7 +3,6 @@ import os
 import json
 import textwrap
 import asyncio
-import requests
 import ast
 import rich
 from rich.tree import Tree

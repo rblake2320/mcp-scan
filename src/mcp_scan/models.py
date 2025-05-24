@@ -1,95 +1,93 @@
-from pydantic import BaseModel, ConfigDict, RootModel, field_validator
-from typing import Any, Literal, NamedTuple, TypeAlias
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Literal, NamedTuple, TypeAlias
+
 from mcp.types import Prompt, Resource, Tool
 
 Entity: TypeAlias = Prompt | Resource | Tool
 
+
 def entity_type_to_str(entity: Entity) -> str:
     if isinstance(entity, Prompt):
         return "prompt"
-    elif isinstance(entity, Resource):
+    if isinstance(entity, Resource):
         return "resource"
-    elif isinstance(entity, Tool):
+    if isinstance(entity, Tool):
         return "tool"
-    else:
-        raise ValueError(f"Unknown entity type: {type(entity)}")
+    raise ValueError(f"Unknown entity type: {type(entity)}")
 
 
-class ScannedEntity(BaseModel):
-    model_config = ConfigDict()
+@dataclass
+class ScannedEntity:
     hash: str
     type: str
     verified: bool
     timestamp: datetime
     description: str | None = None
 
-    @field_validator('timestamp', mode='before')
-    def parse_datetime(cls, value: str | datetime) -> datetime:
-        if isinstance(value, datetime):
-            return value
 
-        # Try standard ISO format first
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError:
-            pass
+ScannedEntities: TypeAlias = dict[str, ScannedEntity]
 
-        # Try custom format: "DD/MM/YYYY, HH:MM:SS"
-        try:
-            return datetime.strptime(value, "%d/%m/%Y, %H:%M:%S")
-        except ValueError:
-            raise ValueError(f"Unrecognized datetime format: {value}")
-
-ScannedEntities = RootModel[dict[str, ScannedEntity]]
 
 class Result(NamedTuple):
     value: Any = None
     message: str | None = None
 
-class SSEServer(BaseModel):
-    model_config = ConfigDict()
+
+@dataclass
+class SSEServer:
     url: str
-    type: Literal["sse"] | None = 'sse'
-    headers: dict[str, str] = {}
+    type: Literal["sse"] | None = "sse"
+    headers: dict[str, str] = field(default_factory=dict)
 
 
-class StdioServer(BaseModel):
-    model_config = ConfigDict()
+@dataclass
+class StdioServer:
     command: str
     args: list[str] | None = None
-    type: Literal["stdio"] | None = 'stdio'
-    env: dict[str, str] = {}
+    type: Literal["stdio"] | None = "stdio"
+    env: dict[str, str] = field(default_factory=dict)
 
 
-class MCPConfig(BaseModel):
+class MCPConfig:
     def get_servers(self) -> dict[str, SSEServer | StdioServer]:
-        raise NotImplementedError("Subclasses must implement this method")
-    def set_servers(self, servers: dict[str, SSEServer | StdioServer]) -> None:
-        raise NotImplementedError("Subclasses must implement this method")
+        raise NotImplementedError
 
+    def set_servers(self, servers: dict[str, SSEServer | StdioServer]) -> None:
+        raise NotImplementedError
+
+
+@dataclass
 class ClaudeConfigFile(MCPConfig):
-    model_config = ConfigDict()
     mcpServers: dict[str, SSEServer | StdioServer]
+
     def get_servers(self) -> dict[str, SSEServer | StdioServer]:
         return self.mcpServers
+
     def set_servers(self, servers: dict[str, SSEServer | StdioServer]) -> None:
         self.mcpServers = servers
 
+
+@dataclass
 class VSCodeMCPConfig(MCPConfig):
-    # see https://code.visualstudio.com/docs/copilot/chat/mcp-servers
-    model_config = ConfigDict()
     inputs: list[Any] | None = None
-    servers: dict[str, SSEServer | StdioServer]
+    servers: dict[str, SSEServer | StdioServer] = field(default_factory=dict)
+
     def get_servers(self) -> dict[str, SSEServer | StdioServer]:
         return self.servers
+
     def set_servers(self, servers: dict[str, SSEServer | StdioServer]) -> None:
         self.servers = servers
 
+
+@dataclass
 class VSCodeConfigFile(MCPConfig):
-    model_config = ConfigDict()
     mcp: VSCodeMCPConfig
+
     def get_servers(self) -> dict[str, SSEServer | StdioServer]:
         return self.mcp.servers
+
     def set_servers(self, servers: dict[str, SSEServer | StdioServer]) -> None:
         self.mcp.servers = servers

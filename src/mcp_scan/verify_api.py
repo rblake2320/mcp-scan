@@ -1,4 +1,3 @@
-import requests
 import json
 import ast
 from .models import Result
@@ -39,6 +38,9 @@ def verify_server(
         "messages": messages,
     }
     try:
+        # Import requests lazily to avoid hard dependency during test runs
+        import requests
+
         response = requests.post(url, headers=headers, data=json.dumps(data))
         if response.status_code == 200:
             response_content: dict = response.json()
