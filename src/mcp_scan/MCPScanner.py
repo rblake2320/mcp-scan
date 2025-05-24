@@ -1,15 +1,35 @@
 import os
-from mcp import ClientSession, StdioServerParameters, types
-from mcp.client.stdio import stdio_client
-from mcp.client.sse import sse_client
 import json
 import os
+try:
+    from mcp import ClientSession, StdioServerParameters, types
+    from mcp.client.stdio import stdio_client
+    from mcp.client.sse import sse_client
+    MCP_AVAILABLE = True
+except Exception:
+    ClientSession = None
+    StdioServerParameters = None
+    types = None
+    stdio_client = None
+    sse_client = None
+    MCP_AVAILABLE = False
 import textwrap
 import asyncio
-import requests
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except Exception:
+    requests = None
+    REQUESTS_AVAILABLE = False
 import ast
-import rich
-from rich.tree import Tree
+try:
+    import rich
+    from rich.tree import Tree
+    RICH_AVAILABLE = True
+except Exception:
+    rich = None
+    Tree = None
+    RICH_AVAILABLE = False
 from .surpressIO import SuppressStd
 from collections import namedtuple
 from datetime import datetime
@@ -81,6 +101,8 @@ def format_inspect_tool_line(
 
 
 def verify_server(tools, prompts, resources, base_url):
+    if not REQUESTS_AVAILABLE:
+        raise ImportError("requests package is required to verify server")
     if len(tools) == 0:
         return []
     messages = [
@@ -119,6 +141,8 @@ def verify_server(tools, prompts, resources, base_url):
 
 
 async def check_server(server_config, timeout):
+    if not MCP_AVAILABLE:
+        raise ImportError("mcp package is required to check servers")
     def get_client(server_config):
         if "url" in server_config:
             raise NotImplementedError("SSE servers not supported yet")
@@ -157,8 +181,8 @@ def scan_config_file(path):
     path = os.path.expanduser(path)
     with open(path, "r") as f:
         config = json.load(f)
-        servers = config.get("mcpServers")
-        return servers
+    servers = config.get("mcpServers") or {}
+    return servers
 
 
 class StorageFile:
