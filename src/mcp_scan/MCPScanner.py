@@ -1,13 +1,16 @@
 import os
-from pydoc import describe
-from re import A
 import traceback
-from mcp import ClientSession, StdioServerParameters, types
-from mcp.client.stdio import stdio_client
-from mcp.client.sse import sse_client
-from mcp.types import Implementation as MCPClientImplementation
+try:
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    from mcp.client.sse import sse_client
+    from mcp.types import Implementation as MCPClientImplementation
+except ImportError as e:  # pragma: no cover - runtime dependency check
+    raise ImportError(
+        "The 'mcp' package is required for MCP-Scan. "
+        "Install it with 'pip install mcp[cli]' to enable scanning."
+    ) from e
 import json
-import os
 import textwrap
 import asyncio
 import requests
