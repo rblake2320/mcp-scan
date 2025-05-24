@@ -2,7 +2,7 @@ import os
 import json
 from datetime import datetime
 from hashlib import md5
-from pydantic import ValidationError
+from dataclasses import asdict as dataclass_asdict
 from .models import Result, Entity, entity_type_to_str, ScannedEntities, ScannedEntity
 import rich
 from .utils import upload_whitelist_entry
@@ -12,7 +12,7 @@ class StorageFile:
     def __init__(self, path: str):
         self.path = os.path.expanduser(path)
         # if path is a file
-        self.scanned_entities: ScannedEntities = ScannedEntities({})
+        self.scanned_entities: ScannedEntities = {}
         self.whitelist: dict[str, str] = {}
 
         self.save_scanned_entities: bool = True
@@ -24,9 +24,12 @@ class StorageFile:
             if "__whitelist" in legacy_data:
                 self.whitelist = legacy_data["__whitelist"]
                 del legacy_data["__whitelist"]
+            # legacy files stored a dictionary of scanned entities
             try:
-                self.scanned_entities = ScannedEntities.model_validate(legacy_data)
-            except ValidationError as e:
+                self.scanned_entities = {
+                    k: ScannedEntity(**v) for k, v in legacy_data.items()
+                }
+            except Exception as e:
                 rich.print(f"[bold red]Error loading legacy storage file: {e}[/bold red]")
                 rich.print(f"[bold red]Please fix the file {self.path}, or delete it.[/bold red]")
                 self.save_scanned_entities = False
@@ -37,8 +40,11 @@ class StorageFile:
             if os.path.exists(scanned_entities_path):
                 with open(scanned_entities_path, "r") as f:
                     try:
-                        self.scanned_entities = ScannedEntities.model_validate_json(f.read())
-                    except ValidationError as e:
+                        data = json.load(f)
+                        self.scanned_entities = {
+                            k: ScannedEntity(**v) for k, v in data.items()
+                        }
+                    except Exception as e:
                         print(f"[bold red]Error loading scanned entities file: {e}[/bold red]")
                         rich.print(f"[bold red]Please fix the file {scanned_entities_path}, or delete it.[/bold red]")
                         self.save_scanned_entities = False
@@ -67,15 +73,15 @@ class StorageFile:
         changed = False
         message = None
         prev_data = None
-        if key in self.scanned_entities.root:
-            prev_data = self.scanned_entities.root[key]
+        if key in self.scanned_entities:
+            prev_data = self.scanned_entities[key]
             changed = prev_data.hash != new_data.hash
             if changed:
                 message = (
                     f"{entity_type} description changed since previous scan at "
                     + prev_data.timestamp.strftime("%d/%m/%Y, %H:%M:%S")
                 )
-        self.scanned_entities.root[key] = new_data
+        self.scanned_entities[key] = new_data
         return Result(changed, message), prev_data
 
     def print_whitelist(self) -> None:
@@ -104,7 +110,7 @@ class StorageFile:
     def save(self) -> None:
         os.makedirs(self.path, exist_ok=True)
         with open(os.path.join(self.path, "scanned_entities.json"), "w") as f:
-            f.write(self.scanned_entities.model_dump_json())
+            json.dump({k: dataclass_asdict(v) for k, v in self.scanned_entities.items()}, f)
         with open(os.path.join(self.path, "whitelist.json"), "w") as f:
             json.dump(self.whitelist, f)
         
