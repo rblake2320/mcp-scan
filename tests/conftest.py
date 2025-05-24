@@ -1,5 +1,12 @@
 """Global pytest fixtures for mcp-scan tests."""
 
+import os
+import sys
+
+# Add the project src directory to ``sys.path`` so that tests can import
+# ``mcp_scan`` without needing the package to be installed first.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
 import pytest
 
 

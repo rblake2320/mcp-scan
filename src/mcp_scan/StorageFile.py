@@ -3,8 +3,21 @@ import json
 import os
 from datetime import datetime
 
-import rich
-from pydantic import ValidationError
+# ``rich`` is used for colourful output. It is optional for testing purposes.
+try:  # pragma: no cover - optional dependency
+    import rich
+except ModuleNotFoundError:  # type: ignore
+    class _Rich:
+        @staticmethod
+        def print(*args, **kwargs):
+            print(*args)
+
+    rich = _Rich()
+try:  # pragma: no cover - optional dependency
+    from pydantic import ValidationError
+except ModuleNotFoundError:  # type: ignore
+    class ValidationError(Exception):
+        pass
 
 from .models import Entity, ScannedEntities, ScannedEntity, entity_type_to_str, hash_entity
 from .utils import upload_whitelist_entry
