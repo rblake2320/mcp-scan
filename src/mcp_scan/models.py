@@ -2,7 +2,18 @@ from datetime import datetime
 from hashlib import md5
 from typing import Any, Literal, TypeAlias
 
-from mcp.types import Prompt, Resource, Tool
+try:  # pragma: no cover - optional dependency
+    from mcp.types import Prompt, Resource, Tool
+except Exception:  # pragma: no cover - allow running tests without mcp installed
+    class Prompt:  # type: ignore[empty-body]
+        pass
+
+    class Resource:  # type: ignore[empty-body]
+        pass
+
+    class Tool:  # type: ignore[empty-body]
+        pass
+
 from pydantic import BaseModel, ConfigDict, RootModel, field_serializer, field_validator, model_serializer
 
 Entity: TypeAlias = Prompt | Resource | Tool

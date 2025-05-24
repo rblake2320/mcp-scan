@@ -1,21 +1,27 @@
 import json
 
 import aiohttp
-from lark import Lark
+try:  # pragma: no cover - optional dependency
+    from lark import Lark
+except Exception:  # pragma: no cover - fall back to shlex if lark unavailable
+    Lark = None
+    import shlex
 
 
 def rebalance_command_args(command, args):
+    if Lark is None:
+        parts = shlex.split(command)
+        return parts[0], parts[1:] + (args or [])
+
     # create a parser that splits on whitespace,
-    # unless it is inside "." or '.'
-    # unless that is escaped
-    # permit arbitrary whitespace between parts
+    # unless it is inside quotes
     parser = Lark(
         r"""
         command: WORD+
         WORD: (PART|SQUOTEDPART|DQUOTEDPART)
         PART: /[^\s'".]+/
-        SQUOTEDPART: /'[^']'/
-        DQUOTEDPART: /"[^"]"/
+        SQUOTEDPART: /'[^']*'/
+        DQUOTEDPART: /"[^"]*"/
         %import common.WS
         %ignore WS
         """,
@@ -24,10 +30,8 @@ def rebalance_command_args(command, args):
         regex=True,
     )
     tree = parser.parse(command)
-    command = [node.value for node in tree.children]
-    args = command[1:] + (args or [])
-    command = command[0]
-    return command, args
+    parts = [node.value for node in tree.children]
+    return parts[0], parts[1:] + (args or [])
 
 
 async def upload_whitelist_entry(name: str, hash: str, base_url: str):
