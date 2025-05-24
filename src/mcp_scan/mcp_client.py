@@ -2,21 +2,20 @@ import asyncio
 import os
 from typing import AsyncContextManager, Type
 
-import aiofiles  # type: ignore
-import pyjson5
+try:
+    import aiofiles  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    aiofiles = None
+try:
+    import pyjson5
+except Exception:  # pragma: no cover - optional dependency
+    import json as pyjson5  # type: ignore
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.types import Prompt, Resource, Tool
 
-from mcp_scan.models import (
-    ClaudeConfigFile,
-    MCPConfig,
-    SSEServer,
-    StdioServer,
-    VSCodeConfigFile,
-    VSCodeMCPConfig,
-)
+from mcp_scan.models import MCPConfig, SSEServer, StdioServer
 
 from .suppressIO import SuppressStd
 from .utils import rebalance_command_args
@@ -86,32 +85,37 @@ async def check_server_with_timeout(
 
 
 async def scan_mcp_config_file(path: str) -> MCPConfig:
+    """Load a simple MCP config file."""
     path = os.path.expanduser(path)
 
-    def parse_and_validate(config: dict) -> MCPConfig:
-        models: list[Type[MCPConfig]] = [
-            ClaudeConfigFile,  # used by most clients
-            VSCodeConfigFile,  # used by vscode settings.json
-            VSCodeMCPConfig,  # used by vscode mcp.json
-        ]
-        errors = []
-        for model in models:
-            try:
-                return model.model_validate(config)
-            except Exception as e:
-                errors.append(e)
-        if len(errors) > 0:
-            raise Exception(
-                "Could not parse config file as any of "
-                + str([model.__name__ for model in models])
-                + "\nErrors:\n"
-                + "\n".join([str(e) for e in errors])
-            )
+    if aiofiles is not None:
+        async with aiofiles.open(path, "r") as f:
+            content = await f.read()
+    else:
+        with open(path, "r") as f:
+            content = f.read()
+
+    config = pyjson5.loads(content)
+
+    if "mcpServers" in config:
+        servers_cfg = config["mcpServers"]
+    elif "servers" in config:
+        servers_cfg = config["servers"]
+    elif "mcp" in config and isinstance(config["mcp"], dict) and "servers" in config["mcp"]:
+        servers_cfg = config["mcp"]["servers"]
+    else:
         raise Exception("Could not parse config file")
 
-    async with aiofiles.open(path, "r") as f:
-        content = await f.read()
-        # use json5 to support comments as in vscode
-        config = pyjson5.loads(content)
-        # try to parse model
-        return parse_and_validate(config)
+    servers = {}
+    for name, srv in servers_cfg.items():
+        srv_type = srv.get("type", "stdio")
+        if srv_type == "sse":
+            servers[name] = SSEServer(url=srv["url"], headers=srv.get("headers", {}))
+        else:
+            servers[name] = StdioServer(
+                command=srv["command"],
+                args=srv.get("args"),
+                env=srv.get("env", {}),
+            )
+
+    return MCPConfig(servers)
