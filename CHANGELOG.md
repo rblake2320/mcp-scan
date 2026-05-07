@@ -1,3 +1,4 @@
+- `0.1.7` added repository health sweep automation script and expanded project hygiene tooling
 - `0.1.4.0` initial public release
 - `0.1.4.1` `inspect` command, reworked output
 - `0.1.4.2` added SSE support
