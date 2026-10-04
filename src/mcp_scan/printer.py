@@ -1,4 +1,8 @@
+import builtins
+import importlib
 import textwrap
+from collections.abc import Iterable, Sequence
+from typing import Protocol, cast, runtime_checkable
 
 import rich
 from rich.text import Text
@@ -7,10 +11,43 @@ from rich.tree import Tree
 from .models import Entity, EntityScanResult, ScanPathResult, entity_type_to_str, hash_entity
 
 
-def format_err_str(e: Exception, max_length: int | None = None) -> str:
+def _load_exception_group_types() -> tuple[type[BaseException], ...]:
+    builtin_exception_group = getattr(builtins, "ExceptionGroup", None)
+    if isinstance(builtin_exception_group, type) and issubclass(builtin_exception_group, BaseException):
+        return (builtin_exception_group,)
+
     try:
-        if isinstance(e, ExceptionGroup):
-            text = ", ".join([format_err_str(e) for e in e.exceptions])
+        module = importlib.import_module("exceptiongroup")
+    except ModuleNotFoundError:
+        return ()
+
+    exception_group = getattr(module, "ExceptionGroup", None)
+    if isinstance(exception_group, type) and issubclass(exception_group, BaseException):
+        return (exception_group,)
+    return ()
+
+
+_EXCEPTION_GROUP_TYPES = _load_exception_group_types()
+
+
+@runtime_checkable
+class _ExceptionGroupProtocol(Protocol):
+    exceptions: Sequence[BaseException]
+
+
+def _iter_exception_args(exc: BaseException) -> Iterable[str]:
+    for arg in exc.args:
+        if isinstance(arg, BaseException):
+            yield format_err_str(arg)
+        else:
+            yield str(arg)
+
+
+def format_err_str(e: BaseException, max_length: int | None = None) -> str:
+    try:
+        if _EXCEPTION_GROUP_TYPES and isinstance(e, _EXCEPTION_GROUP_TYPES):
+            group = cast(_ExceptionGroupProtocol, e)
+            text = ", ".join(format_err_str(exc) for exc in group.exceptions)
         elif isinstance(e, TimeoutError):
             text = "Could not reach server within timeout"
         else:
@@ -20,13 +57,7 @@ def format_err_str(e: Exception, max_length: int | None = None) -> str:
     if text is None:
         name = type(e).__name__
         try:
-
-            def _mapper(e: Exception | str) -> str:
-                if isinstance(e, Exception):
-                    return format_err_str(e)
-                return str(e)
-
-            message = ",".join(map(_mapper, e.args))
+            message = ",".join(_iter_exception_args(e))
         except Exception:
             message = str(e)
         message = message.strip()
